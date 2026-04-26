@@ -53,6 +53,7 @@ def chat():
         api_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
 
         # Z.ai API呼び出し
+        print(f"Calling Z.ai API with model: glm-4.7-flash")
         response = client.chat.completions.create(
             model="glm-4.7-flash",
             messages=api_messages,
@@ -60,7 +61,22 @@ def chat():
             max_tokens=2000
         )
 
+        print(f"API Response: {response}")
+
+        # レスポンスの検証
+        if not response or not hasattr(response, 'choices'):
+            raise ValueError("Invalid API response: missing 'choices'")
+
+        if not response.choices or len(response.choices) == 0:
+            raise ValueError("Invalid API response: empty 'choices'")
+
+        if not response.choices[0].message:
+            raise ValueError("Invalid API response: missing 'message'")
+
         assistant_message = response.choices[0].message.content
+
+        if not assistant_message:
+            raise ValueError("Invalid API response: empty message content")
 
         # アシスタントの返答を履歴に追加
         messages.append({"role": "assistant", "content": assistant_message})
@@ -77,6 +93,8 @@ def chat():
     except Exception as e:
         error_message = f"エラーが発生しました: {str(e)}"
         print(f"Error in /chat: {error_message}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": error_message}), 500
 
 @app.route("/reset", methods=["POST"])
