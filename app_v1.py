@@ -11,7 +11,7 @@ app.secret_key = os.urandom(24)
 # Z.ai GLM-4.7-Flash クライアント設定
 client = OpenAI(
     api_key=os.getenv("ZAI_API_KEY"),
-    base_url="https://api.z.ai/api/openai/v1"
+    base_url="https://api.z.ai/api/paas/v4/"
 )
 
 # 固定Systemプロンプト
