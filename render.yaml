@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: nanaka-watercress-ai
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app_v1:app
+    envVars:
+      - key: ZAI_API_KEY
+        sync: false
