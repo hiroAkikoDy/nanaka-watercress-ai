@@ -1,6 +1,7 @@
 import os
+import time
 from flask import Flask, render_template, request, jsonify, session
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -8,7 +9,7 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
-# Z.ai GLM-4.7-Flash クライアント設定
+# Z.ai GLM-4.7 クライアント設定
 client = OpenAI(
     api_key=os.getenv("ZAI_API_KEY"),
     base_url="https://api.z.ai/api/paas/v4/"
@@ -52,16 +53,32 @@ def chat():
         # API呼び出し用にSystemプロンプトを先頭に追加
         api_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
 
-        # Z.ai API呼び出し
-        print(f"Calling Z.ai API with model: glm-4.7-flash")
-        response = client.chat.completions.create(
-            model="glm-4.7-flash",
-            messages=api_messages,
-            temperature=0.7,
-            max_tokens=2000
-        )
+        # Z.ai API呼び出し（リトライロジック付き）
+        print(f"Calling Z.ai API with model: GLM-4.7")
+        max_retries = 3
+        retry_delay = 2  # 秒
 
-        print(f"API Response: {response}")
+        for attempt in range(max_retries):
+            try:
+                response = client.chat.completions.create(
+                    model="GLM-4.7",
+                    messages=api_messages,
+                    temperature=0.7,
+                    max_tokens=2000
+                )
+                print(f"API Response: {response}")
+                break
+            except RateLimitError as e:
+                if attempt < max_retries - 1:
+                    print(f"Rate limit error, retrying in {retry_delay} seconds... (attempt {attempt + 1}/{max_retries})")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # 指数バックオフ
+                else:
+                    raise RateLimitError(
+                        "Z.ai API が一時的に利用できません。しばらく待ってから再度お試しください。",
+                        response=e.response,
+                        body=e.body
+                    )
 
         # レスポンスの検証
         if not response or not hasattr(response, 'choices'):
@@ -86,10 +103,14 @@ def chat():
         session.modified = True
 
         return jsonify({
-            "response": assistant_message,
+            "reply": assistant_message,
             "message_count": len(messages)
         })
 
+    except RateLimitError as e:
+        error_message = "Z.ai API が一時的に利用できません。サービスが過負荷状態です。数分待ってから再度お試しください。"
+        print(f"Rate limit error in /chat: {str(e)}")
+        return jsonify({"error": error_message}), 429
     except Exception as e:
         error_message = f"エラーが発生しました: {str(e)}"
         print(f"Error in /chat: {error_message}")

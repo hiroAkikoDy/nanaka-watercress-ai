@@ -4,5 +4,8 @@ __pycache__/
 *.pyc
 *.pyo
 *.so
+*.log
 .env.local
 .DS_Store
+test_*.py
+app_startup.log
